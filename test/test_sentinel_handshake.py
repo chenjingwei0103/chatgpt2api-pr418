@@ -40,13 +40,23 @@ class PowTokenTests(unittest.TestCase):
 
 
 class ImageModelSlugTests(unittest.TestCase):
-    def test_web_image_models_map_to_auto(self):
-        api = OpenAIBackendAPI("")
-        for model in ("gpt-image-2", "gpt-image-2.5", "auto", ""):
-            self.assertEqual(api._image_model_settings(model), ("auto", ""), model)
+    def test_web_image_models_stay_auto_when_upstream_is_auto(self):
+        config = mock.Mock(
+            default_upstream_model_name="auto",
+            default_upstream_model_name_25="",
+            default_thinking_effort="auto",
+        )
+        with mock.patch.object(openai_backend_api, "config", config):
+            api = OpenAIBackendAPI("")
+            for model in ("gpt-image-2", "gpt-image-2.5", "auto", ""):
+                self.assertEqual(api._image_model_settings(model), ("auto", ""), model)
 
     def test_codex_image_model_keeps_its_own_slug(self):
-        self.assertEqual(OpenAIBackendAPI("")._image_model_settings("codex-gpt-image-2"), ("codex-gpt-image-2", ""))
+        config = mock.Mock(default_thinking_effort="auto")
+        with mock.patch.object(openai_backend_api, "config", config):
+            api = OpenAIBackendAPI("")
+            self.assertEqual(api._image_model_settings("codex-gpt-image-2"), ("codex-gpt-image-2", ""))
+            self.assertEqual(api._image_model_settings("codex-gpt-image-2.5"), ("codex-gpt-image-2.5", ""))
 
 
 class SolverClientTests(unittest.TestCase):
@@ -167,12 +177,21 @@ class SentinelHandshakeTests(unittest.TestCase):
         api = OpenAIBackendAPI("")
         self.addCleanup(api.close)
         requirements = ChatRequirements(token="requirements", proof_token="proof", turnstile_token="turnstile")
+        image_config = mock.Mock(
+            default_upstream_model_name="auto",
+            default_upstream_model_name_25="",
+            default_thinking_effort="auto",
+        )
         response = mock.Mock(status_code=200)
         response.json.return_value = {"conduit_token": "conduit"}
         reference = {"file_id": "file-1", "width": 100, "height": 200, "file_size": 20,
                      "mime_type": "image/png", "file_name": "input.png"}
         for references in (None, [reference]):
-            with self.subTest(edit=bool(references)), mock.patch.object(api.session, "post", return_value=response) as post:
+            with (
+                self.subTest(edit=bool(references)),
+                mock.patch.object(openai_backend_api, "config", image_config),
+                mock.patch.object(api.session, "post", return_value=response) as post,
+            ):
                 api._prepare_image_conversation("cat", requirements, "gpt-image-2")
                 api._start_image_generation("cat", requirements, "conduit", "gpt-image-2", references)
             first, second = post.call_args_list
