@@ -56,8 +56,10 @@ def parse_pow_resources(html_content: str) -> tuple[list[str], str]:
 
 
 def _legacy_parse_time() -> str:
-    now = datetime.now(timezone(timedelta(hours=-5)))
-    return now.strftime("%a %b %d %Y %H:%M:%S") + " GMT-0500 (Eastern Standard Time)"
+    # Conversation requests declare Asia/Shanghai. This Date#toString field has
+    # to use the same zone; an Eastern string is rejected as a disguised 404.
+    now = datetime.now(timezone(timedelta(hours=8)))
+    return now.strftime("%a %b %d %Y %H:%M:%S") + " GMT+0800 (China Standard Time)"
 
 
 def build_pow_config(

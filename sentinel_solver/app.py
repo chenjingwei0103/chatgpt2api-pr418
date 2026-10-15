@@ -83,10 +83,13 @@ async ([requirements, key, asset]) => {
     if (!turnstile || typeof turnstile.getEnforcementToken !== 'function') {
       return 'ERR:getEnforcementToken missing';
     }
-    // The SDK looks its seed up in a WeakMap keyed by the requirements object;
-    // hand it the p token instead.
+    // The SDK looks its seed up in a WeakMap keyed by the requirements object.
+    // tokenCache is also a WeakMap; intercepting it makes getEnforcementToken
+    // echo the p token back instead of running the challenge VM.
     const original = WeakMap.prototype.get;
+    const cache = turnstile.tokenCache;
     WeakMap.prototype.get = function (target) {
+      if (cache && this === cache) return original.call(this, target);
       return target === requirements ? key : original.call(this, target);
     };
     try {
